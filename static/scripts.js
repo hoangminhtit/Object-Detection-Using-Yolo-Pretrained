@@ -106,7 +106,7 @@ function applyModel() {
         
         // Reset apply button
         applyModelBtn.disabled = false;
-        applyModelBtn.textContent = '🚀 Apply Model';
+        applyModelBtn.textContent = 'Apply Model';
     });
 }
 
@@ -115,14 +115,93 @@ function handleOptionChange(event) {
     const selectedOption = event.target.value;
     console.log('Selected option:', selectedOption);
     
-    // Có thể thêm logic khác nhau cho từng option
+    // Logic khác nhau cho từng option
     if (selectedOption === 'realTimeDetection') {
-        // Có thể disable một số feature cho real-time
         console.log('Real-time detection mode selected');
+        
+        // Hiển thị thông báo và nút launch
+        showRealtimeOptions();
+        
     } else {
         // Image detection mode
         console.log('Image detection mode selected');
+        hideRealtimeOptions();
     }
+}
+
+function showRealtimeOptions() {
+    // Tạo UI cho real-time nếu chưa có
+    let realtimeUI = document.getElementById('realtimeOptions');
+    if (!realtimeUI) {
+        realtimeUI = document.createElement('div');
+        realtimeUI.id = 'realtimeOptions';
+        realtimeUI.className = 'mt-3 p-3 bg-light border rounded';
+        realtimeUI.innerHTML = `
+            <div class="d-flex gap-2">
+                <button class="btn btn-success btn-sm" onclick="launchRealtimeApp()">
+                    Launch Camera Application
+                </button>
+            </div>
+        `;
+        
+        // Thêm sau option select
+        const optionDiv = document.getElementById('optionSelect').parentElement;
+        optionDiv.appendChild(realtimeUI);
+    }
+    realtimeUI.style.display = 'block';
+}
+
+function hideRealtimeOptions() {
+    const realtimeUI = document.getElementById('realtimeOptions');
+    if (realtimeUI) {
+        realtimeUI.style.display = 'none';
+    }
+}
+
+function launchRealtimeApp() {
+    // Lấy confidence value
+    const confidenceSlider = document.getElementById('confidenceSlider');
+    const confidence = confidenceSlider ? confidenceSlider.value : 0.6;
+    
+    // Hiển thị loading
+    const button = event.target;
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '🔄 Launching...';
+    
+    // Gọi API launch real-time
+    fetch('/api/launch-realtime', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            confidence: parseFloat(confidence)
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(`✅ ${data.message}\n\n${data.instruction}`);
+        } else {
+            throw new Error(data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error launching real-time:', error);
+        alert(`❌ Failed to launch real-time detection: ${error.message}`);
+    })
+    .finally(() => {
+        // Reset button
+        button.disabled = false;
+        button.textContent = originalText;
+    });
+}
+
+function useRealtimeForUpload() {
+    // Chỉ cần thông báo và ẩn options
+    alert('🖼️ Real-time model activated for image uploads!\n\nNow upload an image and click "Apply Model" to use the fast real-time detection model.');
+    hideRealtimeOptions();
 }
 
 // Hàm download ảnh đã xử lý

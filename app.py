@@ -5,99 +5,29 @@ import numpy as np
 import io
 import base64
 import os
-from models import test_model_pytorch, get_pytorch_detector
+import imageDetection
 import time
+import subprocess
+import threading
 
 app = Flask(__name__)
 CORS(app)
 
-# option
+# Processor functions for different options
+def process_image_detection(image, confidence):
+    """Process static image detection"""
+    return imageDetection.process_image_with_pytorch(image, confidence)
 
+# Options mapping
 OPS = {
-    'imageDetection': get_pytorch_detector,
-    'realTimeDetection': '',
+    'imageDetection': process_image_detection,
+    # 'realTimeDetection': process_realtime_detection,
 }
-
-# Global detector instance
-detector = None
-
-def load_pytorch_model():
-    """Load PyTorch YOLO model at startup"""
-    global detector
-    try:
-        detector = get_pytorch_detector()
-        print("PyTorch model loaded successfully!")
-        return True
-    except Exception as e:
-        print(f"Error loading PyTorch model: {e}")
-        return False
 
 @app.route('/')
 def index():
     """Main page with simple_detection.html template"""
     return render_template('index.html')
-
-def process_image_with_pytorch(image_array, confidence_threshold=0.6):
-    """
-    Process image using PyTorch YOLO model
-    
-    Args:
-        image_array: numpy array from uploaded image
-        confidence_threshold: minimum confidence score
-        
-    Returns:
-        dict: processing results
-    """
-    try:
-        start_time = time.time()
-        
-        # Use global detector or create new one
-        global detector
-        if detector is None:
-            detector = get_pytorch_detector()
-        
-        # Detect objects
-        detections, inference_time = detector.detect_objects(
-            image_array, 
-            confidence_threshold=confidence_threshold
-        )
-        
-        # Draw bounding boxes
-        result_image = detector.draw_detections(
-            image_array, 
-            detections, 
-            confidence_threshold=confidence_threshold
-        )
-        
-        # Convert result to base64
-        _, buffer = cv2.imencode('.png', result_image)
-        result_base64 = base64.b64encode(buffer).decode('utf-8')
-        
-        total_time = time.time() - start_time
-        
-        # Format response
-        return {
-            'status': 'success',
-            'result_image': f"data:image/png;base64,{result_base64}",
-            'objects_count': len(detections),
-            'processing_time': round(total_time, 3),
-            'inference_time': round(inference_time, 3),
-            'detections': [
-                {
-                    'class_name': det['class_name'],
-                    'confidence': round(det['confidence'], 3),
-                    'bbox': det['bbox']
-                }
-                for det in detections
-            ]
-        }
-        
-    except Exception as e:
-        print(f"Error in process_image_with_pytorch: {e}")
-        return {
-            'status': 'error',
-            'message': f"Processing failed: {str(e)}"
-        }
 
 @app.route('/api/', methods=['POST'])
 def api_object_detection():
@@ -144,15 +74,32 @@ def api_object_detection():
                     'message': 'Invalid image format'
                 }), 400
             
-            # Process with PyTorch
-            result = process_image_with_pytorch(image, confidence)
+            # Process based on selected option
+            if option in OPS:
+                result = OPS[option](image, confidence)
+                return jsonify(result)
+            else:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Unknown option: {option}'
+                }), 400
         
-        else :
-            pass
+        elif option == 'realTimeDetection':
+            # Real-time detection can process uploaded images with RT model
+            if option in OPS:
+                result = OPS[option](image, confidence)
+                return jsonify(result)
+            else:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Real-time detection processor not found'
+                }), 500
         
-        out = OPS[option](result)
-        
-        return jsonify(out)
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': f'Unsupported option: {option}'
+            }), 400
         
     except Exception as e:
         print(f"API Error: {e}")
@@ -161,24 +108,69 @@ def api_object_detection():
             'message': f"Server error: {str(e)}"
         }), 500
 
+@app.route('/api/launch-realtime', methods=['POST'])
+def api_launch_realtime():
+    """Launch standalone real-time detection app"""
+    try:
+        # Get confidence from request
+        data = request.get_json() or {}
+        confidence = float(data.get('confidence', 0.6))
+        confidence = max(0.1, min(0.9, confidence))
+        
+        # Launch real-time script in separate process
+        def launch_script():
+            try:
+                subprocess.run([
+                    'python', 'run_realtime.py', 
+                    '--confidence', str(confidence)
+                ], cwd=os.getcwd(), check=True)
+            except subprocess.CalledProcessError as e:
+                print(f"Real-time script failed: {e}")
+            except Exception as e:
+                print(f"Error launching real-time: {e}")
+        
+        # Start in background thread to not block web server
+        thread = threading.Thread(target=launch_script)
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Real-time detection launched with confidence {confidence}',
+            'instruction': 'Check your desktop for the camera window. Press Q to quit.'
+        })
+        
+    except Exception as e:
+        print(f"Launch Real-time Error: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': f"Failed to launch real-time detection: {str(e)}"
+        }), 500
+
 @app.route('/health')
 def health_check():
     """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
-        'model_loaded': detector is not None,
-        'framework': 'PyTorch + Ultralytics YOLO'
+        'image_model_loaded': imageDetection.detector is not None,
+        'framework': 'PyTorch + Ultralytics YOLO',
+        'available_options': list(OPS.keys()),
+        'endpoints': {
+            'image_detection': '/api/',
+            'webcam_realtime': '/api/webcam',
+            'webcam_start': '/api/webcam/start', 
+            'webcam_stop': '/api/webcam/stop',
+            'launch_realtime_app': '/api/launch-realtime'
+        }
     })
 
 if __name__ == '__main__':
-    print("Starting Flask app with PyTorch YOLO...")
     
-    # Load model at startup
-    model_loaded = load_pytorch_model()
+    # Load models at startup
+    image_model_loaded = imageDetection.load_pytorch_model()
     
-    if model_loaded:
-        print("Ready to serve!")
+    if image_model_loaded:
+        print("Application is running")
         app.run(host='0.0.0.0', port=5000, debug=True)
     else:
-        print("Failed to load model. Please check dependencies.")
-        print("Run: pip install -r requirements.txt")
+        print("Failed to load models. Please check dependencies.")
