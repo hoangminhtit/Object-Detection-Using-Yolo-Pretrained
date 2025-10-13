@@ -1,0 +1,23 @@
+# PyTorch Object Detection Requirements (Python 3.12 compatible)
+
+# Core web framework
+Flask==3.0.3
+Flask-CORS==5.0.0
+
+# Image processing
+opencv-python==4.10.0.84
+Pillow==10.4.0
+
+# Scientific computing
+numpy==1.26.4
+matplotlib==3.9.2
+pandas==2.2.2
+
+# PyTorch ecosystem (CPU version for compatibility)
+torch==2.4.1
+torchvision==0.19.1
+ultralytics==8.2.103
+
+# Utilities
+tqdm==4.66.5
+pathlib2==2.3.7

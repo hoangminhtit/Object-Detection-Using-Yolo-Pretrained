@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Object Detection Application</title>
+    <link rel="stylesheet" href="{{url_for('static', filename='style.css')}}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+</head>
+<body>
+    <div class="container-fluid">
+        <h4>Welcome to Object Detection Application. This application has created to detect objects via digital images.</h4>
+        <div class="d-flex">
+            <div class="left m-3">
+                <div class="card">
+                    <!-- Khu vực hiển thị ảnh preview -->
+                    <div id="imagePreview" class="mb-3">
+                        <p id="noImageText">No image selected</p>
+                        <img id="previewImage" src="" alt="Preview" />
+                    </div>
+                    
+                    <div class="form-group mt-2">
+                        <input 
+                            type="file" 
+                            class="form-control"
+                            id="fileInput"
+                            name="fileInput"
+                            accept=".jpg,.jpeg,.png"
+                            onchange="handleFileChange(event)"
+                        />
+                        <label for="fileInput" class="btn btn-secondary btn-sm mt-2">Tải ảnh</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="right">
+                <div class="card">
+                    <!-- Khu vực hiển thị ảnh đã xử lý -->
+                    <div id="processedImagePreview" class="mb-3">
+                        <p id="noProcessedImageText">No processed image</p>
+                        <img id="processedImage" src="" alt="Processed" />
+                    </div>
+                    
+                    <div class="form-group mt-2">
+                        <button 
+                            class="btn btn-primary btn-sm"
+                            id="applyModelBtn"
+                            onclick="applyModel()"
+                        >
+                        Apply Model
+                        </button>
+                        
+                        <button 
+                            class="btn btn-success btn-sm mt-2"
+                            id="downloadBtn"
+                            onclick="downloadProcessedImage()"
+                            disabled
+                        >
+                            Tải ảnh đã xử lý
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+             <div class="form-group mt-3">
+                <label for="optionSelect" class="form-label">Chọn chế độ:</label>
+                <select 
+                    class="form-select"
+                    id="optionSelect"
+                    onchange="handleOptionChange(event)">
+                    <option value="imageDetection">Image Detection</option>
+                    <option value="realTimeDetection">Real Time Detection</option>
+                </select>
+            </div>
+
+        </div>
+    </div>
+    
+    <!-- JavaScript should be at the end for better performance -->
+    <script src="{{url_for('static', filename='scripts.js')}}"></script>
+</body>
+</html>
