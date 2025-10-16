@@ -113,11 +113,17 @@ function applyModel() {
 // Hàm xử lý thay đổi option
 function handleOptionChange(event) {
     const selectedOption = event.target.value;
+    const confidenceContainer = document.getElementById('confidenceContainer');
+    
     console.log('Selected option:', selectedOption);
     
-    // Logic khác nhau cho từng option
     if (selectedOption === 'realTimeDetection') {
         console.log('Real-time detection mode selected');
+        
+        // Hiển thị confidence slider cho real-time
+        if (confidenceContainer) {
+            confidenceContainer.style.display = 'block';
+        }
         
         // Hiển thị thông báo và nút launch
         showRealtimeOptions();
@@ -125,9 +131,16 @@ function handleOptionChange(event) {
     } else {
         // Image detection mode
         console.log('Image detection mode selected');
+        
+        // Ẩn confidence slider cho image detection
+        if (confidenceContainer) {
+            confidenceContainer.style.display = 'none';
+        }
+        
         hideRealtimeOptions();
     }
 }
+
 
 function showRealtimeOptions() {
     // Tạo UI cho real-time nếu chưa có
@@ -149,6 +162,12 @@ function showRealtimeOptions() {
         optionDiv.appendChild(realtimeUI);
     }
     realtimeUI.style.display = 'block';
+    
+    // Show confidence slider for realtime detection
+    const confidenceContainer = document.getElementById('confidenceContainer');
+    if (confidenceContainer) {
+        confidenceContainer.style.display = 'block';
+    }
 }
 
 function hideRealtimeOptions() {
