@@ -70,6 +70,11 @@ function applyModel() {
     const optionSelect = document.getElementById('optionSelect');
     const selectedOption = optionSelect ? optionSelect.value : 'imageDetection';
     formData.append('option', selectedOption);
+    
+    // Lấy confidence threshold
+    const confidenceSlider = document.getElementById('confidenceSlider');
+    const confidence = confidenceSlider ? confidenceSlider.value : 0.6;
+    formData.append('confidence', confidence);
     // Gọi API backend
     fetch('/api/', {
         method: 'POST',
@@ -91,9 +96,24 @@ function applyModel() {
             // Enable download button
             downloadBtn.disabled = false;
             
+            // Hiển thị thông tin detection
+            if (data.detections && data.detections.length > 0) {
+                let detectionInfo = `Đã phát hiện ${data.objects_count} đối tượng:\n`;
+                if (data.class_counts) {
+                    for (const [className, count] of Object.entries(data.class_counts)) {
+                        detectionInfo += `- ${className}: ${count}\n`;
+                    }
+                }
+                detectionInfo += `\nThời gian xử lý: ${data.processing_time}s`;
+                if (data.method) {
+                    detectionInfo += `\nPhương pháp: ${data.method}`;
+                }
+                console.log(detectionInfo);
+            }
+            
             // Reset apply button
             applyModelBtn.disabled = false;
-            applyModelBtn.textContent = 'Apply Model';
+            applyModelBtn.textContent = 'Áp dụng';
             
             // alert(`Xử lý ảnh hoàn thành! Thời gian: ${data.processing_time}s`);
         } else {
@@ -106,7 +126,7 @@ function applyModel() {
         
         // Reset apply button
         applyModelBtn.disabled = false;
-        applyModelBtn.textContent = 'Apply Model';
+        applyModelBtn.textContent = 'Áp dụng';
     });
 }
 
@@ -129,12 +149,12 @@ function handleOptionChange(event) {
         showRealtimeOptions();
         
     } else {
-        // Image detection mode
-        console.log('Image detection mode selected');
+        // Image detection hoặc hybrid detection mode
+        console.log('Image/Hybrid detection mode selected');
         
-        // Ẩn confidence slider cho image detection
+        // Hiển thị confidence slider cho tất cả các mode
         if (confidenceContainer) {
-            confidenceContainer.style.display = 'none';
+            confidenceContainer.style.display = 'block';
         }
         
         hideRealtimeOptions();
@@ -150,6 +170,16 @@ function showRealtimeOptions() {
         realtimeUI.id = 'realtimeOptions';
         realtimeUI.className = 'mt-3 p-3 bg-light border rounded';
         realtimeUI.innerHTML = `
+            <h6>Real-time Detection Options:</h6>
+            <div class="mb-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="hybridRealtimeCheck">
+                    <label class="form-check-label" for="hybridRealtimeCheck">
+                        Use Hybrid Models (COCO + Custom)
+                    </label>
+                </div>
+                <small class="text-muted">Hybrid mode provides better accuracy but may be slower</small>
+            </div>
             <div class="d-flex gap-2">
                 <button class="btn btn-success btn-sm" onclick="launchRealtimeApp()">
                     Launch Camera Application
@@ -182,11 +212,18 @@ function launchRealtimeApp() {
     const confidenceSlider = document.getElementById('confidenceSlider');
     const confidence = confidenceSlider ? confidenceSlider.value : 0.6;
     
+    // Lấy hybrid option
+    const hybridCheck = document.getElementById('hybridRealtimeCheck');
+    const useHybrid = hybridCheck ? hybridCheck.checked : false;
+    
     // Hiển thị loading
     const button = event.target;
     const originalText = button.textContent;
     button.disabled = true;
-    button.textContent = '🔄 Launching...';
+    button.textContent = 'Launching...';
+    
+    const modelType = useHybrid ? "Hybrid (COCO + Custom)" : "Standard YOLO";
+    console.log(`Launching real-time with ${modelType}, confidence: ${confidence}`);
     
     // Gọi API launch real-time
     fetch('/api/launch-realtime', {
@@ -195,7 +232,8 @@ function launchRealtimeApp() {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            confidence: parseFloat(confidence)
+            confidence: parseFloat(confidence),
+            hybrid: useHybrid
         })
     })
     .then(response => response.json())
@@ -208,7 +246,7 @@ function launchRealtimeApp() {
     })
     .catch(error => {
         console.error('Error launching real-time:', error);
-        alert(`❌ Failed to launch real-time detection: ${error.message}`);
+        alert(`Failed to launch real-time detection: ${error.message}`);
     })
     .finally(() => {
         // Reset button
@@ -219,7 +257,7 @@ function launchRealtimeApp() {
 
 function useRealtimeForUpload() {
     // Chỉ cần thông báo và ẩn options
-    alert('🖼️ Real-time model activated for image uploads!\n\nNow upload an image and click "Apply Model" to use the fast real-time detection model.');
+    alert('Real-time model activated for image uploads!\n\nNow upload an image and click "Apply Model" to use the fast real-time detection model.');
     hideRealtimeOptions();
 }
 

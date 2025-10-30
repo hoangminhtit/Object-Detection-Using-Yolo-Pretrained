@@ -68,13 +68,14 @@
                     class="form-select"
                     id="optionSelect"
                     onchange="handleOptionChange(event)">
-                    <option value="imageDetection">Image Detection</option>
+                    <option value="imageDetection">Standard YOLO</option>
+                    <option value="hybridDetection">Hybrid COCO + Custom</option>
                     <option value="realTimeDetection">Real Time Detection</option>
                 </select>
             </div>
 
-            <!-- Confidence slider - chỉ hiển thị cho Real Time Detection -->
-            <div class="form-group m-3" id="confidenceContainer" style="width: 200px; display: none;">
+            <!-- Confidence slider - hiển thị cho tất cả các method -->
+            <div class="form-group m-3" id="confidenceContainer" style="width: 200px;">
                 <label for="confidenceSlider" class="form-label">
                     Confidence Threshold: <span id="confidenceValue" class="fw-bold text-primary">0.6</span>
                 </label>

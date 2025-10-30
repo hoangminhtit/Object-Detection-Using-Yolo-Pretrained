@@ -18,9 +18,14 @@ def process_image_detection(image, confidence):
     """Process static image detection"""
     return imageDetection.process_image_with_pytorch(image, confidence)
 
+def process_hybrid_detection(image, confidence):
+    """Process hybrid COCO + Custom detection"""
+    return imageDetection.process_image_with_hybrid(image, confidence)
+
 # Options mapping
 OPS = {
     'imageDetection': process_image_detection,
+    'hybridDetection': process_hybrid_detection,
     # 'realTimeDetection': process_realtime_detection,
 }
 
@@ -37,7 +42,7 @@ def api_object_detection():
     try:
         option = request.form.get("option", "imageDetection")
         
-        if option == 'imageDetection':
+        if option in ['imageDetection', 'hybridDetection']:
             # Check if file is present
             if 'file' not in request.files:
                 return jsonify({
@@ -112,18 +117,25 @@ def api_object_detection():
 def api_launch_realtime():
     """Launch standalone real-time detection app"""
     try:
-        # Get confidence from request
+        # Get parameters from request
         data = request.get_json() or {}
         confidence = float(data.get('confidence', 0.6))
         confidence = max(0.1, min(0.9, confidence))
+        use_hybrid = data.get('hybrid', False)
         
         # Launch real-time script in separate process
         def launch_script():
             try:
-                subprocess.run([
+                cmd = [
                     'python', 'run_realtime.py', 
                     '--confidence', str(confidence)
-                ], cwd=os.getcwd(), check=True)
+                ]
+                
+                # Add hybrid flag if requested
+                if use_hybrid:
+                    cmd.append('--hybrid')
+                
+                subprocess.run(cmd, cwd=os.getcwd(), check=True)
             except subprocess.CalledProcessError as e:
                 print(f"Real-time script failed: {e}")
             except Exception as e:
@@ -134,10 +146,11 @@ def api_launch_realtime():
         thread.daemon = True
         thread.start()
         
+        model_type = "Hybrid (COCO + Custom)" if use_hybrid else "Standard YOLO"
         return jsonify({
             'status': 'success',
-            'message': f'Real-time detection launched with confidence {confidence}',
-            'instruction': 'Check your desktop for the camera window. Press Q to quit.'
+            'message': f'Real-time detection launched with {model_type} model, confidence {confidence}',
+            'instruction': 'Check your desktop for the camera window. Press Q to quit, H to toggle hybrid mode.'
         })
         
     except Exception as e:
@@ -168,9 +181,14 @@ if __name__ == '__main__':
     
     # Load models at startup
     image_model_loaded = imageDetection.load_pytorch_model()
+    hybrid_model_loaded = imageDetection.load_hybrid_model()
     
     if image_model_loaded:
         print("Application is running")
+        if hybrid_model_loaded:
+            print("Both standard and hybrid models are available")
+        else:
+            print("Standard model only - hybrid detection may not work")
         app.run(host='0.0.0.0', port=5000, debug=True)
     else:
         print("Failed to load models. Please check dependencies.")

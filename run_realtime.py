@@ -8,18 +8,29 @@ import os
 import subprocess
 import argparse
 from collections import Counter
+from hybrid_models import HybridDetector
 
-def run_realtime_detection(confidence=0.6):
+def run_realtime_detection(confidence=0.6, use_hybrid=False):
     """
     Chạy real-time detection với webcam
     
     Args:
         confidence: ngưỡng confidence (default: 0.6)
+        use_hybrid: sử dụng hybrid detection (COCO + Custom)
     """
     
     try:
-        # Load YOLO model
-        model = YOLO("yolov8n.pt")  # Model nhẹ cho real-time
+        # Load model based on selection
+        if use_hybrid:
+            print("🔄 Loading Hybrid Models (COCO + Custom)...")
+            detector = HybridDetector()
+            model_name = "Hybrid COCO + Custom"
+        else:
+            print("🔄 Loading Standard YOLO Model...")
+            model = YOLO("yolov8n.pt")  # Model nhẹ cho real-time
+            model_name = "Standard YOLOv8n"
+        
+        print(f"✅ Model loaded: {model_name}")
         
         # Mở camera
         cap = cv2.VideoCapture(0)
@@ -38,6 +49,7 @@ def run_realtime_detection(confidence=0.6):
         print("   - Press 's' to save current frame")
         print("   - Press 'c' to change confidence threshold")
         print("   - Press 'r' to show object count report")
+        print("   - Press 'h' to toggle hybrid/standard mode")
         print("")
         
         frame_count = 0
@@ -52,37 +64,75 @@ def run_realtime_detection(confidence=0.6):
             
             frame_count += 1
             
-            # Chạy detection
-            results = model(frame, conf=confidence, verbose=False)
-            
-            # Count objects by class trong frame hiện tại
+            # Chạy detection dựa trên mode
             current_frame_objects = Counter()
-            if results[0].boxes is not None:
-                for box in results[0].boxes:
-                    class_id = int(box.cls[0].cpu().numpy())
-                    class_name = model.names[class_id]
-                    conf = float(box.conf[0].cpu().numpy())
-                    
-                    # Count objects trong frame hiện tại
-                    current_frame_objects[class_name] += 1
-                    
-                    # Update total count (accumulated)
-                    total_object_counts[class_name] += 1
-                    
-                    # Save detection info
-                    session_detections.append({
-                        'frame': frame_count,
-                        'class': class_name,
-                        'confidence': conf,
-                        'timestamp': frame_count  # Simple timestamp
-                    })
             
-            # Vẽ kết quả lên frame
-            annotated_frame = results[0].plot()
+            if use_hybrid:
+                # Sử dụng hybrid detection
+                try:
+                    result_image, detections_list, inference_time = detector.detect_hybrid(
+                        frame, conf=confidence, save=False, show=False
+                    )
+                    annotated_frame = result_image
+                    
+                    # Process hybrid detections
+                    for detection in detections_list:
+                        class_name = detection['class_name']
+                        conf = detection['confidence']
+                        
+                        # Count objects trong frame hiện tại
+                        current_frame_objects[class_name] += 1
+                        
+                        # Update total count (accumulated)
+                        total_object_counts[class_name] += 1
+                        
+                        # Save detection info
+                        session_detections.append({
+                            'frame': frame_count,
+                            'class': class_name,
+                            'confidence': conf,
+                            'model_source': detection.get('model_source', 'hybrid'),
+                            'timestamp': frame_count
+                        })
+                        
+                except Exception as e:
+                    print(f"Hybrid detection error: {e}")
+                    # Fallback to frame copy if hybrid fails
+                    annotated_frame = frame.copy()
+                    
+            else:
+                # Sử dụng standard YOLO
+                results = model(frame, conf=confidence, verbose=False)
+                
+                # Count objects by class trong frame hiện tại
+                if results[0].boxes is not None:
+                    for box in results[0].boxes:
+                        class_id = int(box.cls[0].cpu().numpy())
+                        class_name = model.names[class_id]
+                        conf = float(box.conf[0].cpu().numpy())
+                        
+                        # Count objects trong frame hiện tại
+                        current_frame_objects[class_name] += 1
+                        
+                        # Update total count (accumulated)
+                        total_object_counts[class_name] += 1
+                        
+                        # Save detection info
+                        session_detections.append({
+                            'frame': frame_count,
+                            'class': class_name,
+                            'confidence': conf,
+                            'model_source': 'standard',
+                            'timestamp': frame_count
+                        })
+                
+                # Vẽ kết quả lên frame
+                annotated_frame = results[0].plot()
             
-            # Hiển thị thông tin frame
+            # Hiển thị thông tin frame với model type
             total_current = sum(current_frame_objects.values())
-            info_text = f"Frame: {frame_count} | Conf: {confidence:.1f} | Objects: {total_current}"
+            mode_text = "HYBRID" if use_hybrid else "STANDARD"
+            info_text = f"Frame: {frame_count} | {mode_text} | Conf: {confidence:.1f} | Objects: {total_current}"
             cv2.putText(annotated_frame, info_text, (10, 30), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
             
@@ -106,12 +156,13 @@ def run_realtime_detection(confidence=0.6):
                                cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
             
             # Hiển thị các phím tắt
-            controls_text = "Press: 'q'=quit, 's'=save, 'c'=confidence, 'r'=report"
+            controls_text = "Press: 'q'=quit, 's'=save, 'c'=confidence, 'r'=report, 'h'=hybrid toggle"
             cv2.putText(annotated_frame, controls_text, (10, annotated_frame.shape[0] - 10), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
             
-            # Hiển thị frame
-            cv2.imshow("Real-time Object Detection with Counter (YOLOv8)", annotated_frame)
+            # Hiển thị frame với title phù hợp
+            window_title = f"Real-time Detection - {model_name} (YOLOv8)"
+            cv2.imshow(window_title, annotated_frame)
             
             # Xử lý phím nhấn
             key = cv2.waitKey(1) & 0xFF
@@ -131,11 +182,30 @@ def run_realtime_detection(confidence=0.6):
                 next_idx = (current_idx + 1) % len(conf_values)
                 confidence = conf_values[next_idx]
                 print(f"Confidence changed to: {confidence}")
+            elif key == ord('h'):
+                # Toggle hybrid mode
+                use_hybrid = not use_hybrid
+                if use_hybrid:
+                    print("🔄 Switching to Hybrid Detection (COCO + Custom)...")
+                    try:
+                        detector = HybridDetector()
+                        model_name = "Hybrid COCO + Custom"
+                        print("✅ Hybrid models loaded successfully!")
+                    except Exception as e:
+                        print(f"❌ Failed to load hybrid models: {e}")
+                        use_hybrid = False
+                        model_name = "Standard YOLOv8n"
+                else:
+                    print("🔄 Switching to Standard YOLO...")
+                    model = YOLO("yolov8n.pt")
+                    model_name = "Standard YOLOv8n"
+                    print("✅ Standard model loaded!")
             elif key == ord('r'):
                 # Show object count report
                 print("="*60)
                 print("OBJECT DETECTION REPORT")
                 print("="*60)
+                print(f"Current model: {model_name}")
                 print(f"Total frames processed: {frame_count}")
                 print(f"Current confidence threshold: {confidence}")
                 
@@ -164,8 +234,7 @@ def run_realtime_detection(confidence=0.6):
                 print("="*60 + "\n")
                 print("res:\n",df_object_count)
                 try:
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # tạo chuỗi thời gian hợp lệ
-                    with open(f'./data/object_count_{timestamp}.json', 'w') as f:
+                    with open('./data/object_count.json', 'w') as f:
                         json.dump(df_object_count, f, indent=4, ensure_ascii=False)  # ✅ Ghi dict vào file JSON
 
                 except:
@@ -178,6 +247,7 @@ def run_realtime_detection(confidence=0.6):
         # Show final summary
         print("\n" + "🎉 FINAL SESSION SUMMARY")
         print("="*70)
+        print(f"Final model used: {model_name}")
         print(f"Total frames processed: {frame_count}")
         print(f"Final confidence threshold: {confidence}")
         
@@ -206,6 +276,8 @@ def main():
     parser = argparse.ArgumentParser(description='Real-time Object Detection with YOLO')
     parser.add_argument('--confidence', '-c', type=float, default=0.6,
                         help='Confidence threshold (0.1-0.9, default: 0.6)')
+    parser.add_argument('--hybrid', action='store_true',
+                        help='Use hybrid detection (COCO + Custom models)')
     parser.add_argument('--no-display', action='store_true',
                         help='Run without display (for debugging)')
     
@@ -219,7 +291,7 @@ def main():
         return True
     
     # Chạy real-time detection
-    success = run_realtime_detection(confidence)
+    success = run_realtime_detection(confidence, use_hybrid=args.hybrid)
     
     try:
         subprocess.run([
