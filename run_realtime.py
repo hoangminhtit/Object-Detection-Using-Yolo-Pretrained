@@ -27,7 +27,7 @@ def run_realtime_detection(confidence=0.6, use_hybrid=False):
             model_name = "Hybrid COCO + Custom"
         else:
             print("🔄 Loading Standard YOLO Model...")
-            model = YOLO("yolov8n.pt")  # Model nhẹ cho real-time
+            model = YOLO("./model_weights/yolov8n.pt")  # Model nhẹ cho real-time
             model_name = "Standard YOLOv8n"
         
         print(f"✅ Model loaded: {model_name}")
@@ -197,7 +197,7 @@ def run_realtime_detection(confidence=0.6, use_hybrid=False):
                         model_name = "Standard YOLOv8n"
                 else:
                     print("🔄 Switching to Standard YOLO...")
-                    model = YOLO("yolov8n.pt")
+                    model = YOLO("./model_weights/yolov8n.pt")
                     model_name = "Standard YOLOv8n"
                     print("✅ Standard model loaded!")
             elif key == ord('r'):

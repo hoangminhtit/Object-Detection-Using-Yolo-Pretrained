@@ -24,7 +24,7 @@ class PyTorchObjectDetector:
     Thay thế cho GluonCV model_zoo
     """
     
-    def __init__(self, model_name='yolov8n.pt'):
+    def __init__(self, model_name='./model_weights/yolov8n.pt'):
         """
         Initialize YOLO model
         model_name: 'yolov8n.pt' (nano), 'yolov8s.pt' (small), 'yolov8m.pt' (medium), 'yolov8l.pt' (large)
